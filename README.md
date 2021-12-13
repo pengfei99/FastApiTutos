@@ -143,16 +143,7 @@ You should see a json file like this
             "content": {
               "application/json": {
                 "schema": {
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
+                }}}}}}}}}
 ```
 
 ##### What is OpenAPI for?
@@ -453,3 +444,172 @@ async def read_file(file_path: str):
 Check the url : http://127.0.0.1:8000/files//home/johndoe/myfile.txt
 
 Note the double slash (//) between files and home indicates the start of the value for file_path
+
+
+## 4. Query parameter
+
+In FastAPI, When you declare a function that represents a api endpoint, if the parameters of the function are not 
+the endpoint path parameter, they are automatically interpreted as "query" parameters.
+
+### 4.1 First example
+Add the below endpoint to the main.py
+```python
+@pengfei_fastapi_app.get("/calculator/addition")
+async def addition(x: int = 0, y: int = 0):
+    return x+y
+```
+
+Now, run the app by using **uvicorn**
+
+```shell
+uvicorn main:pengfei_fastapi_app --reload
+```
+
+Check the endpoint with following url, note **?x=2&y=6** is the query parameter specification.
+
+```text
+http://127.0.0.1:8000/calculator/addition?x=2&y=6
+```
+
+### 4.2 Data parsing, validation
+
+Similar to the path parameters, the query parameters in the url are all strings. Without a type indication in the 
+python function, they will be considered as string. If you set a type indicator as the above example, FastApi will
+convert the string to your desire type. 
+
+#### Data validation
+If the parameter can not be converted correctly, you will get a http error.
+Try the below query
+
+```text
+http://127.0.0.1:8000/calculator/addition?x=2&y=6
+
+# You will receive below error message
+{"detail":[{"loc":["query","x"],"msg":"value is not a valid integer","type":"type_error.integer"}]}
+```
+
+### 4.3 Default values
+
+**As query parameters are not a fixed part of a path, they can be optional and can have default values.**
+In the example above they have default values of x=0 and y=0.
+
+So, going to the URL: http://127.0.0.1:8000/calculator/addition, you will get 0 as result. 
+
+You can also give one parameter and let the other parameter takes the default value
+Check the below url, you will get 2 as result
+```text
+http://127.0.0.1:8000/calculator/addition?x=2
+```
+
+### 4.4 Optional parameters
+
+We can also declare optional query parameters in your endpoints. For instance, add below endpoint to main.py:
+
+```python
+from typing import Optional
+
+@pengfei_fastapi_app.get("/products/{product_id}")
+async def read_product(product_id: str, product_name: Optional[str] = None):
+    if product_name:
+        return {"product_id": product_id, "product_name": product_name}
+    return {"product_id": product_id}
+```
+Note the parameter product_name has type Optional[str] and has a default value None. You can also notice the function
+read_product() test first if the optional parameter is empty or not to avoid null pointer.
+
+**Note: FastAPI will know that product_name is optional because of the = None. The Optional in Optional[str] is not 
+used by FastAPI (FastAPI will only use the str part), but the Optional[str] will let your editor help you 
+finding errors in your code.**
+
+### 4.5 Bool type conversion
+
+Conversion from string to int is quite standard in FastAPI. But the bool conversion is a little special.
+
+Add the following endpoint to the main.py
+
+```python
+@pengfei_fastapi_app.get("/product-nums/{product_id}")
+async def product_number(product_id: str, product_name: Optional[str] = None, warehouse: bool = False):
+    if warehouse:
+        product_num = 18
+    else:
+        product_num = 8
+    if product_name:
+        return {"product_id": product_id, "product_name": product_name, "product_number": product_num}
+    return {"product_id": product_id, "product_number": product_num}
+```
+Test the endpoint with the following urls
+
+```text
+http://127.0.0.1:8000/product-nums/p1?product_name=cat%20food&warehouse=true
+http://127.0.0.1:8000/product-nums/p1?product_name=cat%20food&warehouse=True
+
+http://127.0.0.1:8000/product-nums/p1?product_name=cat%20food&warehouse=1
+http://127.0.0.1:8000/product-nums/p1?product_name=cat%20food&warehouse=on
+http://127.0.0.1:8000/product-nums/p1?product_name=cat%20food&warehouse=yes
+http://127.0.0.1:8000/product-nums/p1?product_name=cat%20food&warehouse=YES
+```
+
+They will all return the following response. Which means the string in the list ["true","True","1","on","yes"] are 
+all converted to True. Note the uppercase, or First letter uppercase will not affect the result.
+
+```json
+{
+  "product_id": "p1",
+  "product_name": "cat food",
+  "product_number": 18
+}
+```
+
+### 4.6 Multiple path and query parameters
+
+You can declare multiple path parameters and query parameters at the same time, FastAPI knows which is which.
+
+And you don't have to declare them in any specific order.
+
+Add the following endpoint in main.py
+
+```python
+@pengfei_fastapi_app.get("/users/{user_id}/items/{item_id}")
+async def read_user_item(
+    user_id: int, item_id: str, q: Optional[str] = None, short: bool = False
+):
+    item = {"item_id": item_id, "owner_id": user_id}
+    if q:
+        item.update({"q": q})
+    if not short:
+        item.update(
+            {"description": "This is an amazing item that has a long description"}
+        )
+    return item
+
+```
+
+Test the above endpoint with this url "http://127.0.0.1:8000/users/123/items/pliu?q=toto&short=true"
+
+### 4.7 Required query parameters
+
+To make a parameter required, you only need to define a parameter without default value or None.
+
+Check the below checkpoint, it has two parameters x,y.  
+```python
+@pengfei_fastapi_app.get("/calculator/soustraction")
+async def soustraction(x: int, y: int):
+    return x + y
+```
+
+Test it with below urls:
+
+```text
+http://127.0.0.1:8000/calculator/soustraction?x=4
+```
+
+You will get an error:
+
+```json
+{"detail":[{"loc":["query","y"],"msg":"field required","type":"value_error.missing"}]}
+```
+
+### 4.8 Recap
+
+You can mix required parameter, optional parameter, and parameter with default value inside one endpoint.
