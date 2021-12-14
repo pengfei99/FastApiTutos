@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import FastAPI
 
 from modelname import ModelName
+from product import Product
 
 # create an instance of FastAPI
 pengfei_fastapi_app = FastAPI()
@@ -76,7 +77,7 @@ async def product_number(product_id: str, product_name: Optional[str] = None, wa
 
 @pengfei_fastapi_app.get("/users/{user_id}/items/{item_id}")
 async def read_user_item(
-    user_id: int, item_id: str, q: Optional[str] = None, short: bool = False
+        user_id: int, item_id: str, q: Optional[str] = None, short: bool = False
 ):
     item = {"item_id": item_id, "owner_id": user_id}
     if q:
@@ -87,3 +88,28 @@ async def read_user_item(
         )
     return item
 
+
+@pengfei_fastapi_app.post("/products/")
+async def create_product(product: Product):
+    return product
+
+
+@pengfei_fastapi_app.post("/products_price/")
+async def create_product_price(product: Product):
+    product_dict = product.dict()
+    if product.tax:
+        total_price = product.price + product.tax
+        product_dict.update({"Total_price": total_price})
+    return product_dict
+
+
+@pengfei_fastapi_app.post("/products_id/{product_id}")
+async def create_product_with_id(product_id: int, product: Product):
+    return {"product_id": product_id, **product.dict()}
+
+
+@pengfei_fastapi_app.post("/products_attrs/{product_id}")
+async def create_product_with_id(product_id: int, product: Product, supplier: Optional[str]):
+    if supplier:
+        return {"product_id": product_id, **product.dict(), "supplier": supplier}
+    return {"product_id": product_id, **product.dict()}
